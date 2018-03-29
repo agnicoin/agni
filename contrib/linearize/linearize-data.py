@@ -17,7 +17,7 @@ import base64
 import httplib
 import sys
 import hashlib
-import dash_hash
+import agni_hash
 import datetime
 import time
 from collections import namedtuple

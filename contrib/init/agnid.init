@@ -1,0 +1,67 @@
+#!/bin/bash
+#
+#  agnid The Agni Core server.
+#
+#
+# chkconfig: 345 80 20
+# description: agnid
+# processname: agnid
+#
+
+# Source function library.
+. /etc/init.d/functions
+
+# you can override defaults in /etc/sysconfig/agnid, see below
+if [ -f /etc/sysconfig/agnid ]; then
+        . /etc/sysconfig/agnid
+fi
+
+RETVAL=0
+
+prog=agnid
+# you can override the lockfile via BITCOIND_LOCKFILE in /etc/sysconfig/agnid
+lockfile=${BITCOIND_LOCKFILE-/var/lock/subsys/agnid}
+
+# agnid defaults to /usr/bin/agnid, override with BITCOIND_BIN
+agnid=${BITCOIND_BIN-/usr/bin/agnid}
+
+# agnid opts default to -disablewallet, override with BITCOIND_OPTS
+agnid_opts=${BITCOIND_OPTS--disablewallet}
+
+start() {
+    echo -n $"Starting $prog: "
+    daemon $DAEMONOPTS $agnid $agnid_opts
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch $lockfile
+    return $RETVAL
+}
+
+stop() {
+    echo -n $"Stopping $prog: "
+    killproc $prog
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && rm -f $lockfile
+    return $RETVAL
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status $prog
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    *)
+        echo "Usage: service $prog {start|stop|status|restart}"
+        exit 1
+        ;;
+esac

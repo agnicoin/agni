@@ -1,8 +1,8 @@
-// Copyright (c) 2014-2017 The Dash Core developers
+// Copyright (c) 2014-2017 The Agni Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-//#define ENABLE_DASH_DEBUG
+//#define ENABLE_AGNI_DEBUG
 
 #include "activemasternode.h"
 #include "governance.h"
@@ -19,9 +19,6 @@
 #include "rpc/server.h"
 #include "util.h"
 #include "utilmoneystr.h"
-#ifdef ENABLE_WALLET
-#include "wallet/wallet.h"
-#endif // ENABLE_WALLET
 
 #include <boost/lexical_cast.hpp>
 
@@ -32,11 +29,7 @@ UniValue gobject(const UniValue& params, bool fHelp)
         strCommand = params[0].get_str();
 
     if (fHelp  ||
-        (
-#ifdef ENABLE_WALLET
-         strCommand != "prepare" &&
-#endif // ENABLE_WALLET
-         strCommand != "vote-many" && strCommand != "vote-conf" && strCommand != "vote-alias" && strCommand != "submit" && strCommand != "count" &&
+        (strCommand != "vote-many" && strCommand != "vote-conf" && strCommand != "vote-alias" && strCommand != "prepare" && strCommand != "submit" && strCommand != "count" &&
          strCommand != "deserialize" && strCommand != "get" && strCommand != "getvotes" && strCommand != "getcurrentvotes" && strCommand != "list" && strCommand != "diff" &&
          strCommand != "check" ))
         throw std::runtime_error(
@@ -44,9 +37,7 @@ UniValue gobject(const UniValue& params, bool fHelp)
                 "Manage governance objects\n"
                 "\nAvailable commands:\n"
                 "  check              - Validate governance object data (proposal only)\n"
-#ifdef ENABLE_WALLET
                 "  prepare            - Prepare governance object by signing and creating tx\n"
-#endif // ENABLE_WALLET
                 "  submit             - Submit governance object to network\n"
                 "  deserialize        - Deserialize governance object from hex string to JSON\n"
                 "  count              - Count governance objects and votes\n"
@@ -56,7 +47,7 @@ UniValue gobject(const UniValue& params, bool fHelp)
                 "  list               - List governance objects (can be filtered by signal and/or object type)\n"
                 "  diff               - List differences since last diff\n"
                 "  vote-alias         - Vote on a governance object by masternode alias (using masternode.conf setup)\n"
-                "  vote-conf          - Vote on a governance object by masternode configured in dash.conf\n"
+                "  vote-conf          - Vote on a governance object by masternode configured in agni.conf\n"
                 "  vote-many          - Vote on a governance object by all masternodes (using masternode.conf setup)\n"
                 );
 
@@ -122,7 +113,6 @@ UniValue gobject(const UniValue& params, bool fHelp)
         return objResult;
     }
 
-#ifdef ENABLE_WALLET
     // PREPARE THE GOVERNANCE OBJECT BY CREATING A COLLATERAL TRANSACTION
     if(strCommand == "prepare")
     {
@@ -188,7 +178,6 @@ UniValue gobject(const UniValue& params, bool fHelp)
 
         return wtx.GetHash().ToString();
     }
-#endif // ENABLE_WALLET
 
     // AFTER COLLATERAL TRANSACTION HAS MATURED USER CAN SUBMIT GOVERNANCE OBJECT TO PROPAGATE NETWORK
     if(strCommand == "submit")
@@ -338,7 +327,7 @@ UniValue gobject(const UniValue& params, bool fHelp)
             nFailed++;
             statusObj.push_back(Pair("result", "failed"));
             statusObj.push_back(Pair("errorMessage", "Can't find masternode by collateral output"));
-            resultsObj.push_back(Pair("dash.conf", statusObj));
+            resultsObj.push_back(Pair("agni.conf", statusObj));
             returnObj.push_back(Pair("overall", strprintf("Voted successfully %d time(s) and failed %d time(s).", nSuccessful, nFailed)));
             returnObj.push_back(Pair("detail", resultsObj));
             return returnObj;
@@ -349,7 +338,7 @@ UniValue gobject(const UniValue& params, bool fHelp)
             nFailed++;
             statusObj.push_back(Pair("result", "failed"));
             statusObj.push_back(Pair("errorMessage", "Failure to sign."));
-            resultsObj.push_back(Pair("dash.conf", statusObj));
+            resultsObj.push_back(Pair("agni.conf", statusObj));
             returnObj.push_back(Pair("overall", strprintf("Voted successfully %d time(s) and failed %d time(s).", nSuccessful, nFailed)));
             returnObj.push_back(Pair("detail", resultsObj));
             return returnObj;
@@ -366,7 +355,7 @@ UniValue gobject(const UniValue& params, bool fHelp)
             statusObj.push_back(Pair("errorMessage", exception.GetMessage()));
         }
 
-        resultsObj.push_back(Pair("dash.conf", statusObj));
+        resultsObj.push_back(Pair("agni.conf", statusObj));
 
         returnObj.push_back(Pair("overall", strprintf("Voted successfully %d time(s) and failed %d time(s).", nSuccessful, nFailed)));
         returnObj.push_back(Pair("detail", resultsObj));
@@ -919,7 +908,6 @@ UniValue getgovernanceinfo(const UniValue& params, bool fHelp)
             "  \"superblockcycle\": xxxxx,               (numeric) the number of blocks between superblocks\n"
             "  \"lastsuperblock\": xxxxx,                (numeric) the block number of the last superblock\n"
             "  \"nextsuperblock\": xxxxx,                (numeric) the block number of the next superblock\n"
-            "  \"maxgovobjdatasize\": xxxxx,             (numeric) maximum governance object data size in bytes\n"
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("getgovernanceinfo", "")
@@ -960,7 +948,6 @@ UniValue getgovernanceinfo(const UniValue& params, bool fHelp)
     obj.push_back(Pair("superblockcycle", Params().GetConsensus().nSuperblockCycle));
     obj.push_back(Pair("lastsuperblock", nLastSuperblock));
     obj.push_back(Pair("nextsuperblock", nNextSuperblock));
-    obj.push_back(Pair("maxgovobjdatasize", MAX_GOVERNANCE_OBJECT_DATA_SIZE));
 
     return obj;
 }

@@ -1,9 +1,8 @@
-// Copyright (c) 2014-2017 The Dash Core developers
+// Copyright (c) 2014-2017 The Agni Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "activemasternode.h"
-#include "base58.h"
 #include "init.h"
 #include "netbase.h"
 #include "validation.h"
@@ -11,9 +10,7 @@
 #include "masternode-sync.h"
 #include "masternodeconfig.h"
 #include "masternodeman.h"
-#ifdef ENABLE_WALLET
 #include "privatesend-client.h"
-#endif // ENABLE_WALLET
 #include "privatesend-server.h"
 #include "rpc/server.h"
 #include "util.h"
@@ -23,7 +20,6 @@
 #include <iomanip>
 #include <univalue.h>
 
-#ifdef ENABLE_WALLET
 void EnsureWalletIsUnlocked();
 
 UniValue privatesend(const UniValue& params, bool fHelp)
@@ -65,7 +61,6 @@ UniValue privatesend(const UniValue& params, bool fHelp)
 
     return "Unknown command, please see \"help privatesend\"";
 }
-#endif // ENABLE_WALLET
 
 UniValue getpoolinfo(const UniValue& params, bool fHelp)
 {
@@ -74,20 +69,18 @@ UniValue getpoolinfo(const UniValue& params, bool fHelp)
             "getpoolinfo\n"
             "Returns an object containing mixing pool related information.\n");
 
-#ifdef ENABLE_WALLET
-    CPrivateSendBase* pprivateSendBase = fMasterNode ? (CPrivateSendBase*)&privateSendServer : (CPrivateSendBase*)&privateSendClient;
+    CPrivateSendBase privateSend = fMasterNode ? (CPrivateSendBase)privateSendServer : (CPrivateSendBase)privateSendClient;
 
     UniValue obj(UniValue::VOBJ);
-    obj.push_back(Pair("state",             pprivateSendBase->GetStateString()));
+    obj.push_back(Pair("state",             privateSend.GetStateString()));
     obj.push_back(Pair("mixing_mode",       (!fMasterNode && privateSendClient.fPrivateSendMultiSession) ? "multi-session" : "normal"));
-    obj.push_back(Pair("queue",             pprivateSendBase->GetQueueSize()));
-    obj.push_back(Pair("entries",           pprivateSendBase->GetEntriesCount()));
+    obj.push_back(Pair("queue",             privateSend.GetQueueSize()));
+    obj.push_back(Pair("entries",           privateSend.GetEntriesCount()));
     obj.push_back(Pair("status",            privateSendClient.GetStatus()));
 
-    masternode_info_t mnInfo;
-    if (privateSendClient.GetMixingMasternodeInfo(mnInfo)) {
-        obj.push_back(Pair("outpoint",      mnInfo.vin.prevout.ToStringShort()));
-        obj.push_back(Pair("addr",          mnInfo.addr.ToString()));
+    if (privateSendClient.infoMixingMasternode.fInfoValid) {
+        obj.push_back(Pair("outpoint",      privateSendClient.infoMixingMasternode.vin.prevout.ToStringShort()));
+        obj.push_back(Pair("addr",          privateSendClient.infoMixingMasternode.addr.ToString()));
     }
 
     if (pwalletMain) {
@@ -95,12 +88,6 @@ UniValue getpoolinfo(const UniValue& params, bool fHelp)
         obj.push_back(Pair("warnings",      pwalletMain->nKeysLeftSinceAutoBackup < PRIVATESEND_KEYS_THRESHOLD_WARNING
                                                 ? "WARNING: keypool is almost depleted!" : ""));
     }
-#else // ENABLE_WALLET
-    UniValue obj(UniValue::VOBJ);
-    obj.push_back(Pair("state",             privateSendServer.GetStateString()));
-    obj.push_back(Pair("queue",             privateSendServer.GetQueueSize()));
-    obj.push_back(Pair("entries",           privateSendServer.GetEntriesCount()));
-#endif // ENABLE_WALLET
 
     return obj;
 }
@@ -113,20 +100,14 @@ UniValue masternode(const UniValue& params, bool fHelp)
         strCommand = params[0].get_str();
     }
 
-#ifdef ENABLE_WALLET
     if (strCommand == "start-many")
         throw JSONRPCError(RPC_INVALID_PARAMETER, "DEPRECATED, please use start-all instead");
-#endif // ENABLE_WALLET
 
     if (fHelp  ||
-        (
-#ifdef ENABLE_WALLET
-            strCommand != "start-alias" && strCommand != "start-all" && strCommand != "start-missing" &&
-         strCommand != "start-disabled" && strCommand != "outputs" &&
-#endif // ENABLE_WALLET
-         strCommand != "list" && strCommand != "list-conf" && strCommand != "count" &&
+        (strCommand != "start" && strCommand != "start-alias" && strCommand != "start-all" && strCommand != "start-missing" &&
+         strCommand != "start-disabled" && strCommand != "list" && strCommand != "list-conf" && strCommand != "count" &&
          strCommand != "debug" && strCommand != "current" && strCommand != "winner" && strCommand != "winners" && strCommand != "genkey" &&
-         strCommand != "connect" && strCommand != "status"))
+         strCommand != "connect" && strCommand != "outputs" && strCommand != "status"))
             throw std::runtime_error(
                 "masternode \"command\"...\n"
                 "Set of commands to execute masternode related actions\n"
@@ -135,12 +116,12 @@ UniValue masternode(const UniValue& params, bool fHelp)
                 "\nAvailable commands:\n"
                 "  count        - Print number of all known masternodes (optional: 'ps', 'enabled', 'all', 'qualify')\n"
                 "  current      - Print info on current masternode winner to be paid the next block (calculated locally)\n"
+                "  debug        - Print masternode status\n"
                 "  genkey       - Generate new masternodeprivkey\n"
-#ifdef ENABLE_WALLET
                 "  outputs      - Print masternode compatible outputs\n"
+                "  start        - Start local Hot masternode configured in agni.conf\n"
                 "  start-alias  - Start single remote masternode by assigned alias configured in masternode.conf\n"
                 "  start-<mode> - Start remote masternodes configured in masternode.conf (<mode>: 'all', 'missing', 'disabled')\n"
-#endif // ENABLE_WALLET
                 "  status       - Print masternode status information\n"
                 "  list         - Print list of all known masternodes (see masternodelist for more info)\n"
                 "  list-conf    - Print masternode.conf in JSON format\n"
@@ -234,7 +215,39 @@ UniValue masternode(const UniValue& params, bool fHelp)
         return obj;
     }
 
-#ifdef ENABLE_WALLET
+    if (strCommand == "debug")
+    {
+        if(activeMasternode.nState != ACTIVE_MASTERNODE_INITIAL || !masternodeSync.IsBlockchainSynced())
+            return activeMasternode.GetStatus();
+
+        COutPoint outpoint;
+        CPubKey pubkey;
+        CKey key;
+
+        if(!pwalletMain || !pwalletMain->GetMasternodeOutpointAndKeys(outpoint, pubkey, key))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing masternode input, please look at the documentation for instructions on masternode creation");
+
+        return activeMasternode.GetStatus();
+    }
+
+    if (strCommand == "start")
+    {
+        if(!fMasterNode)
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "You must set masternode=1 in the configuration");
+
+        {
+            LOCK(pwalletMain->cs_wallet);
+            EnsureWalletIsUnlocked();
+        }
+
+        if(activeMasternode.nState != ACTIVE_MASTERNODE_STARTED){
+            activeMasternode.nState = ACTIVE_MASTERNODE_INITIAL; // TODO: consider better way
+            activeMasternode.ManageState(*g_connman);
+        }
+
+        return activeMasternode.GetStatus();
+    }
+
     if (strCommand == "start-alias")
     {
         if (params.size() < 2)
@@ -333,7 +346,6 @@ UniValue masternode(const UniValue& params, bool fHelp)
 
         return returnObj;
     }
-#endif // ENABLE_WALLET
 
     if (strCommand == "genkey")
     {
@@ -367,7 +379,6 @@ UniValue masternode(const UniValue& params, bool fHelp)
         return resultObj;
     }
 
-#ifdef ENABLE_WALLET
     if (strCommand == "outputs") {
         // Find possible candidates
         std::vector<COutput> vPossibleCoins;
@@ -379,8 +390,8 @@ UniValue masternode(const UniValue& params, bool fHelp)
         }
 
         return obj;
+
     }
-#endif // ENABLE_WALLET
 
     if (strCommand == "status")
     {
@@ -472,9 +483,9 @@ UniValue masternodelist(const UniValue& params, bool fHelp)
                 "  lastpaidblock  - Print the last block height a node was paid on the network\n"
                 "  lastpaidtime   - Print the last time a node was paid on the network\n"
                 "  lastseen       - Print timestamp of when a masternode was last seen on the network\n"
-                "  payee          - Print Dash address associated with a masternode (can be additionally filtered,\n"
+                "  payee          - Print Agni address associated with a masternode (can be additionally filtered,\n"
                 "                   partial match)\n"
-                "  protocol       - Print protocol of a masternode (can be additionally filtered, exact match)\n"
+                "  protocol       - Print protocol of a masternode (can be additionally filtered, exact match))\n"
                 "  pubkey         - Print the masternode (not collateral) public key\n"
                 "  rank           - Print rank of a masternode based on current block\n"
                 "  status         - Print masternode status: PRE_ENABLED / ENABLED / EXPIRED / WATCHDOG_EXPIRED / NEW_START_REQUIRED /\n"
@@ -600,26 +611,19 @@ UniValue masternodebroadcast(const UniValue& params, bool fHelp)
         strCommand = params[0].get_str();
 
     if (fHelp  ||
-        (
-#ifdef ENABLE_WALLET
-            strCommand != "create-alias" && strCommand != "create-all" &&
-#endif // ENABLE_WALLET
-            strCommand != "decode" && strCommand != "relay"))
+        (strCommand != "create-alias" && strCommand != "create-all" && strCommand != "decode" && strCommand != "relay"))
         throw std::runtime_error(
                 "masternodebroadcast \"command\"...\n"
                 "Set of commands to create and relay masternode broadcast messages\n"
                 "\nArguments:\n"
                 "1. \"command\"        (string or set of strings, required) The command to execute\n"
                 "\nAvailable commands:\n"
-#ifdef ENABLE_WALLET
                 "  create-alias  - Create single remote masternode broadcast message by assigned alias configured in masternode.conf\n"
                 "  create-all    - Create remote masternode broadcast messages for all masternodes configured in masternode.conf\n"
-#endif // ENABLE_WALLET
                 "  decode        - Decode masternode broadcast message\n"
                 "  relay         - Relay masternode broadcast message to the network\n"
                 );
 
-#ifdef ENABLE_WALLET
     if (strCommand == "create-alias")
     {
         // wait for reindex and/or import to finish
@@ -722,7 +726,6 @@ UniValue masternodebroadcast(const UniValue& params, bool fHelp)
 
         return returnObj;
     }
-#endif // ENABLE_WALLET
 
     if (strCommand == "decode")
     {

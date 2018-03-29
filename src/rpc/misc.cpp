@@ -1,27 +1,26 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2014-2017 The Dash Core developers
+// Copyright (c) 2014-2017 The Agni Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "base58.h"
 #include "clientversion.h"
 #include "init.h"
+#include "validation.h"
 #include "net.h"
 #include "netbase.h"
 #include "rpc/server.h"
 #include "timedata.h"
 #include "txmempool.h"
 #include "util.h"
+#include "spork.h"
 #include "utilstrencodings.h"
-#include "validation.h"
 #ifdef ENABLE_WALLET
+#include "masternode-sync.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
-
-#include "masternode-sync.h"
-#include "spork.h"
 
 #include <stdint.h>
 
@@ -56,8 +55,8 @@ UniValue getinfo(const UniValue& params, bool fHelp)
             "  \"version\": xxxxx,           (numeric) the server version\n"
             "  \"protocolversion\": xxxxx,   (numeric) the protocol version\n"
             "  \"walletversion\": xxxxx,     (numeric) the wallet version\n"
-            "  \"balance\": xxxxxxx,         (numeric) the total dash balance of the wallet\n"
-            "  \"privatesend_balance\": xxxxxx, (numeric) the anonymized dash balance of the wallet\n"
+            "  \"balance\": xxxxxxx,         (numeric) the total agni balance of the wallet\n"
+            "  \"privatesend_balance\": xxxxxx, (numeric) the anonymized agni balance of the wallet\n"
             "  \"blocks\": xxxxxx,           (numeric) the current number of blocks processed in the server\n"
             "  \"timeoffset\": xxxxx,        (numeric) the time offset\n"
             "  \"connections\": xxxxx,       (numeric) the number of connections\n"
@@ -123,11 +122,11 @@ UniValue debug(const UniValue& params, bool fHelp)
         throw runtime_error(
             "debug ( 0|1|addrman|alert|bench|coindb|db|lock|rand|rpc|selectcoins|mempool"
             "|mempoolrej|net|proxy|prune|http|libevent|tor|zmq|"
-            "dash|privatesend|instantsend|masternode|spork|keepass|mnpayments|gobject )\n"
+            "agni|privatesend|instantsend|masternode|spork|keepass|mnpayments|gobject )\n"
             "Change debug category on the fly. Specify single category or use comma to specify many.\n"
             "\nExamples:\n"
-            + HelpExampleCli("debug", "dash")
-            + HelpExampleRpc("debug", "dash,net")
+            + HelpExampleCli("debug", "agni")
+            + HelpExampleRpc("debug", "agni,net")
         );
 
     std::string strMode = params[0].get_str();
@@ -239,9 +238,7 @@ UniValue spork(const UniValue& params, bool fHelp)
                 ret.push_back(Pair(sporkManager.GetSporkNameByID(nSporkID), sporkManager.IsSporkActive(nSporkID)));
         }
         return ret;
-    }
-#ifdef ENABLE_WALLET
-    else if (params.size() == 2){
+    } else if (params.size() == 2){
         int nSporkID = sporkManager.GetSporkIDByName(params[0].get_str());
         if(nSporkID == -1){
             return "Invalid spork name";
@@ -265,29 +262,23 @@ UniValue spork(const UniValue& params, bool fHelp)
 
     throw runtime_error(
         "spork <name> [<value>]\n"
-        "<name> is the corresponding spork name, or 'show' to show all current spork settings, active to show which sporks are active\n"
-        "<value> is a epoch datetime to enable or disable spork\n"
+        "<name> is the corresponding spork name, or 'show' to show all current spork settings, active to show which sporks are active"
+        "<value> is a epoch datetime to enable or disable spork"
         + HelpRequiringPassphrase());
-#else // ENABLE_WALLET
-    throw runtime_error(
-        "spork <name>\n"
-        "<name> is the corresponding spork name, or 'show' to show all current spork settings, active to show which sporks are active\n");
-#endif // ENABLE_WALLET
-
 }
 
 UniValue validateaddress(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
         throw runtime_error(
-            "validateaddress \"dashaddress\"\n"
-            "\nReturn information about the given dash address.\n"
+            "validateaddress \"agniaddress\"\n"
+            "\nReturn information about the given agni address.\n"
             "\nArguments:\n"
-            "1. \"dashaddress\"     (string, required) The dash address to validate\n"
+            "1. \"agniaddress\"     (string, required) The agni address to validate\n"
             "\nResult:\n"
             "{\n"
             "  \"isvalid\" : true|false,       (boolean) If the address is valid or not. If not, this is the only property returned.\n"
-            "  \"address\" : \"dashaddress\", (string) The dash address validated\n"
+            "  \"address\" : \"agniaddress\", (string) The agni address validated\n"
             "  \"scriptPubKey\" : \"hex\",       (string) The hex encoded scriptPubKey generated by the address\n"
             "  \"ismine\" : true|false,        (boolean) If the address is yours or not\n"
             "  \"iswatchonly\" : true|false,   (boolean) If the address is watchonly\n"
@@ -366,7 +357,7 @@ CScript _createmultisig_redeemScript(const UniValue& params)
     {
         const std::string& ks = keys[i].get_str();
 #ifdef ENABLE_WALLET
-        // Case 1: Dash address and we have full public key:
+        // Case 1: Agni address and we have full public key:
         CBitcoinAddress address(ks);
         if (pwalletMain && address.IsValid())
         {
@@ -417,9 +408,9 @@ UniValue createmultisig(const UniValue& params, bool fHelp)
 
             "\nArguments:\n"
             "1. nrequired      (numeric, required) The number of required signatures out of the n keys or addresses.\n"
-            "2. \"keys\"       (string, required) A json array of keys which are dash addresses or hex-encoded public keys\n"
+            "2. \"keys\"       (string, required) A json array of keys which are agni addresses or hex-encoded public keys\n"
             "     [\n"
-            "       \"key\"    (string) dash address or hex-encoded public key\n"
+            "       \"key\"    (string) agni address or hex-encoded public key\n"
             "       ,...\n"
             "     ]\n"
 
@@ -454,10 +445,10 @@ UniValue verifymessage(const UniValue& params, bool fHelp)
 {
     if (fHelp || params.size() != 3)
         throw runtime_error(
-            "verifymessage \"dashaddress\" \"signature\" \"message\"\n"
+            "verifymessage \"agniaddress\" \"signature\" \"message\"\n"
             "\nVerify a signed message\n"
             "\nArguments:\n"
-            "1. \"dashaddress\"  (string, required) The dash address to use for the signature.\n"
+            "1. \"agniaddress\"  (string, required) The agni address to use for the signature.\n"
             "2. \"signature\"       (string, required) The signature provided by the signer in base 64 encoding (see signmessage).\n"
             "3. \"message\"         (string, required) The message that was signed.\n"
             "\nResult:\n"

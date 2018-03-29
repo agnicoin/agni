@@ -1,0 +1,12 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Agni
+Comment=Agni P2P Cryptocurrency
+Comment[fr]=Agni, monnaie virtuelle cryptographique pair à pair
+Comment[tr]=Agni, eşten eşe kriptografik sanal para birimi
+Exec=agni-qt %u
+Terminal=false
+Type=Application
+Icon=agni128
+MimeType=x-scheme-handler/agni;
+Categories=Office;Finance;

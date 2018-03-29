@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 The Dash Core developers
+// Copyright (c) 2014-2017 The Agni Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,7 +27,7 @@ CCriticalSection cs_mapMasternodePaymentVotes;
 *   Determine if coinbase outgoing created money is the correct value
 *
 *   Why is this needed?
-*   - In Dash some blocks are superblocks, which output much higher amounts of coins
+*   - In Agni some blocks are superblocks, which output much higher amounts of coins
 *   - Otherblocks are 10% lower in outgoing value, so in total, no extra coins are created
 *   - When non-superblocks are detected, the normal schedule should be maintained
 */
@@ -305,7 +305,10 @@ int CMasternodePayments::GetMinMasternodePaymentsProto() {
 
 void CMasternodePayments::ProcessMessage(CNode* pfrom, std::string& strCommand, CDataStream& vRecv, CConnman& connman)
 {
-    if(fLiteMode) return; // disable all Dash specific functionality
+    // Ignore any payments messages until masternode list is synced
+    if(!masternodeSync.IsMasternodeListSynced()) return;
+
+    if(fLiteMode) return; // disable all Agni specific functionality
 
     if (strCommand == NetMsgType::MASTERNODEPAYMENTSYNC) { //Masternode Payments Request Sync
 
@@ -338,11 +341,6 @@ void CMasternodePayments::ProcessMessage(CNode* pfrom, std::string& strCommand, 
         uint256 nHash = vote.GetHash();
 
         pfrom->setAskFor.erase(nHash);
-
-        // TODO: clear setAskFor for MSG_MASTERNODE_PAYMENT_BLOCK too
-
-        // Ignore any payments messages until masternode list is synced
-        if(!masternodeSync.IsMasternodeListSynced()) return;
 
         {
             LOCK(cs_mapMasternodePaymentVotes);
@@ -583,7 +581,7 @@ bool CMasternodeBlockPayees::IsTransactionValid(const CTransaction& txNew)
         }
     }
 
-    LogPrintf("CMasternodeBlockPayees::IsTransactionValid -- ERROR: Missing required payment, possible payees: '%s', amount: %f DASH\n", strPayeesPossible, (float)nMasternodePayment/COIN);
+    LogPrintf("CMasternodeBlockPayees::IsTransactionValid -- ERROR: Missing required payment, possible payees: '%s', amount: %f AGNI\n", strPayeesPossible, (float)nMasternodePayment/COIN);
     return false;
 }
 
@@ -702,7 +700,10 @@ bool CMasternodePaymentVote::IsValid(CNode* pnode, int nValidationHeight, std::s
         if(nRank > MNPAYMENTS_SIGNATURES_TOTAL*2 && nBlockHeight > nValidationHeight) {
             strError = strprintf("Masternode is not in the top %d (%d)", MNPAYMENTS_SIGNATURES_TOTAL*2, nRank);
             LogPrintf("CMasternodePaymentVote::IsValid -- Error: %s\n", strError);
-            Misbehaving(pnode->GetId(), 20);
+            // do not ban nodes before DIP0001 is locked in to avoid banning majority of (old) masternodes
+            if (fDIP0001WasLockedIn) {
+                Misbehaving(pnode->GetId(), 20);
+            }
         }
         // Still invalid however
         return false;
@@ -840,14 +841,11 @@ void CMasternodePayments::CheckPreviousBlockVotes(int nPrevBlockHeight)
 
 void CMasternodePaymentVote::Relay(CConnman& connman)
 {
-    // Do not relay until fully synced
-    if(!masternodeSync.IsSynced()) {
-        LogPrint("mnpayments", "CMasternodePayments::Relay -- won't relay until fully synced\n");
-        return;
-    }
-
+    // do not relay until synced
+    if (!masternodeSync.IsWinnersListSynced()) return;
     CInv inv(MSG_MASTERNODE_PAYMENT_VOTE, GetHash());
-    connman.RelayInv(inv);
+    // relay votes only strictly to new nodes until DIP0001 is locked in to avoid being banned by majority of (old) masternodes
+    connman.RelayInv(inv, fDIP0001WasLockedIn ? mnpayments.GetMinMasternodePaymentsProto() : MIN_MASTERNODE_PAYMENT_PROTO_VERSION_2);
 }
 
 bool CMasternodePaymentVote::CheckSignature(const CPubKey& pubKeyMasternode, int nValidationHeight, int &nDos)

@@ -1,0 +1,20 @@
+<!DOCTYPE RCC><RCC version="1.0">
+    <qresource prefix="/translations">
+        <file alias="bg">locale/agni_bg.qm</file>
+        <file alias="de">locale/agni_de.qm</file>
+        <file alias="en">locale/agni_en.qm</file>
+        <file alias="es">locale/agni_es.qm</file>
+        <file alias="fi">locale/agni_fi.qm</file>
+        <file alias="fr">locale/agni_fr.qm</file>
+        <file alias="it">locale/agni_it.qm</file>
+        <file alias="ja">locale/agni_ja.qm</file>
+        <file alias="pl">locale/agni_pl.qm</file>
+        <file alias="pt">locale/agni_pt.qm</file>
+        <file alias="ru">locale/agni_ru.qm</file>
+        <file alias="sk">locale/agni_sk.qm</file>
+        <file alias="sv">locale/agni_sv.qm</file>
+        <file alias="vi">locale/agni_vi.qm</file>
+        <file alias="zh_CN">locale/agni_zh_CN.qm</file>
+        <file alias="zh_TW">locale/agni_zh_TW.qm</file>
+    </qresource>
+</RCC>

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 The Dash Core developers
+// Copyright (c) 2014-2017 The Agni Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,7 +8,6 @@
 #include "governance-object.h"
 #include "governance-vote.h"
 #include "instantx.h"
-#include "masternode-sync.h"
 #include "masternodeman.h"
 #include "messagesigner.h"
 #include "util.h"
@@ -454,7 +453,7 @@ bool CGovernanceObject::IsValidLocally(std::string& strError, bool& fMissingMast
                 } else if (err == CMasternode::COLLATERAL_UTXO_NOT_FOUND) {
                     strError = "Failed to find Masternode UTXO, missing masternode=" + strOutpoint + "\n";
                 } else if (err == CMasternode::COLLATERAL_INVALID_AMOUNT) {
-                    strError = "Masternode UTXO should have 1000 DASH, missing masternode=" + strOutpoint + "\n";
+                    strError = "Masternode UTXO should have 1000 AGNI, missing masternode=" + strOutpoint + "\n";
                 }
 
                 return false;
@@ -542,7 +541,7 @@ bool CGovernanceObject::IsCollateralValid(std::string& strError, bool& fMissingC
              << ", o.nValue = " << o.nValue
              << ", o.scriptPubKey = " << ScriptToAsmStr( o.scriptPubKey, false )
              << endl; );
-        if(!o.scriptPubKey.IsPayToPublicKeyHash() && !o.scriptPubKey.IsUnspendable()) {
+        if(!o.scriptPubKey.IsNormalPaymentScript() && !o.scriptPubKey.IsUnspendable()){
             strError = strprintf("Invalid Script %s", txCollateral.ToString());
             LogPrintf ("CGovernanceObject::IsCollateralValid -- %s\n", strError);
             return false;
@@ -652,12 +651,6 @@ bool CGovernanceObject::GetCurrentMNVotes(const COutPoint& mnCollateralOutpoint,
 
 void CGovernanceObject::Relay(CConnman& connman)
 {
-    // Do not relay until fully synced
-    if(!masternodeSync.IsSynced()) {
-        LogPrint("gobject", "CGovernanceObject::Relay -- won't relay until fully synced\n");
-        return;
-    }
-
     CInv inv(MSG_GOVERNANCE_OBJECT, GetHash());
     connman.RelayInv(inv, MIN_GOVERNANCE_PEER_PROTO_VERSION);
 }

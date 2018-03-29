@@ -1,9 +1,8 @@
-// Copyright (c) 2014-2017 The Dash Core developers
+// Copyright (c) 2014-2017 The Agni Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "activemasternode.h"
-#include "base58.h"
 #include "init.h"
 #include "netbase.h"
 #include "masternode.h"
@@ -11,11 +10,7 @@
 #include "masternode-sync.h"
 #include "masternodeman.h"
 #include "messagesigner.h"
-#include "script/standard.h"
 #include "util.h"
-#ifdef ENABLE_WALLET
-#include "wallet/wallet.h"
-#endif // ENABLE_WALLET
 
 #include <boost/lexical_cast.hpp>
 
@@ -95,10 +90,27 @@ bool CMasternode::UpdateFromNewBroadcast(CMasternodeBroadcast& mnb, CConnman& co
 //
 arith_uint256 CMasternode::CalculateScore(const uint256& blockHash)
 {
-    // Deterministically calculate a "score" for a Masternode based on any given (block)hash
+    if (fDIP0001WasLockedIn) {
+        // Deterministically calculate a "score" for a Masternode based on any given (block)hash
+        CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
+        ss << vin.prevout << nCollateralMinConfBlockHash << blockHash;
+        return UintToArith256(ss.GetHash());
+    }
+
+    // TODO: remove calculations below after migration to 12.2
+
+    uint256 aux = ArithToUint256(UintToArith256(vin.prevout.hash) + vin.prevout.n);
+
     CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
-    ss << vin.prevout << nCollateralMinConfBlockHash << blockHash;
-    return UintToArith256(ss.GetHash());
+    ss << blockHash;
+    arith_uint256 hash2 = UintToArith256(ss.GetHash());
+
+    CHashWriter ss2(SER_GETHASH, PROTOCOL_VERSION);
+    ss2 << blockHash;
+    ss2 << aux;
+    arith_uint256 hash3 = UintToArith256(ss2.GetHash());
+
+    return (hash3 > hash2 ? hash3 - hash2 : hash2 - hash3);
 }
 
 CMasternode::CollateralStatus CMasternode::CheckCollateral(const COutPoint& outpoint)
@@ -111,16 +123,16 @@ CMasternode::CollateralStatus CMasternode::CheckCollateral(const COutPoint& outp
 {
     AssertLockHeld(cs_main);
 
-    Coin coin;
-    if(!GetUTXOCoin(outpoint, coin)) {
+    CCoins coins;
+    if(!GetUTXOCoins(outpoint, coins)) {
         return COLLATERAL_UTXO_NOT_FOUND;
     }
 
-    if(coin.out.nValue != 1000 * COIN) {
+    if(coins.vout[outpoint.n].nValue != 1000 * COIN) {
         return COLLATERAL_INVALID_AMOUNT;
     }
 
-    nHeightRet = coin.nHeight;
+    nHeightRet = coins.nHeight;
     return COLLATERAL_OK;
 }
 
@@ -344,7 +356,6 @@ void CMasternode::UpdateLastPaid(const CBlockIndex *pindex, int nMaxBlocksToScan
     // LogPrint("masternode", "CMasternode::UpdateLastPaidBlock -- searching for block with payment to %s -- keeping old %d\n", vin.prevout.ToStringShort(), nBlockLastPaid);
 }
 
-#ifdef ENABLE_WALLET
 bool CMasternodeBroadcast::Create(std::string strService, std::string strKeyMasternode, std::string strTxHash, std::string strOutputIndex, std::string& strErrorRet, CMasternodeBroadcast &mnbRet, bool fOffline)
 {
     COutPoint outpoint;
@@ -415,7 +426,6 @@ bool CMasternodeBroadcast::Create(const COutPoint& outpoint, const CService& ser
 
     return true;
 }
-#endif // ENABLE_WALLET
 
 bool CMasternodeBroadcast::SimpleCheck(int& nDos)
 {
@@ -560,7 +570,7 @@ bool CMasternodeBroadcast::CheckOutpoint(int& nDos)
         }
 
         if (err == COLLATERAL_INVALID_AMOUNT) {
-            LogPrint("masternode", "CMasternodeBroadcast::CheckOutpoint -- Masternode UTXO should have 1000 DASH, masternode=%s\n", vin.prevout.ToStringShort());
+            LogPrint("masternode", "CMasternodeBroadcast::CheckOutpoint -- Masternode UTXO should have 1000 AGNI, masternode=%s\n", vin.prevout.ToStringShort());
             return false;
         }
 
@@ -586,7 +596,7 @@ bool CMasternodeBroadcast::CheckOutpoint(int& nDos)
     }
 
     // verify that sig time is legit in past
-    // should be at least not earlier than block when 1000 DASH tx got nMasternodeMinimumConfirmations
+    // should be at least not earlier than block when 1000 AGNI tx got nMasternodeMinimumConfirmations
     uint256 hashBlock = uint256();
     CTransaction tx2;
     GetTransaction(vin.prevout.hash, tx2, Params().GetConsensus(), hashBlock, true);
@@ -594,7 +604,7 @@ bool CMasternodeBroadcast::CheckOutpoint(int& nDos)
         LOCK(cs_main);
         BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
         if (mi != mapBlockIndex.end() && (*mi).second) {
-            CBlockIndex* pMNIndex = (*mi).second; // block for 1000 DASH tx -> 1 confirmation
+            CBlockIndex* pMNIndex = (*mi).second; // block for 1000 AGNI tx -> 1 confirmation
             CBlockIndex* pConfIndex = chainActive[pMNIndex->nHeight + Params().GetConsensus().nMasternodeMinimumConfirmations - 1]; // block where tx got nMasternodeMinimumConfirmations
             if(pConfIndex->GetBlockTime() > sigTime) {
                 LogPrintf("CMasternodeBroadcast::CheckOutpoint -- Bad sigTime %d (%d conf block is at %d) for Masternode %s %s\n",
@@ -654,12 +664,6 @@ bool CMasternodeBroadcast::CheckSignature(int& nDos)
 
 void CMasternodeBroadcast::Relay(CConnman& connman)
 {
-    // Do not relay until fully synced
-    if(!masternodeSync.IsSynced()) {
-        LogPrint("masternode", "CMasternodeBroadcast::Relay -- won't relay until fully synced\n");
-        return;
-    }
-
     CInv inv(MSG_MASTERNODE_ANNOUNCE, GetHash());
     connman.RelayInv(inv);
 }
@@ -819,12 +823,6 @@ bool CMasternodePing::CheckAndUpdate(CMasternode* pmn, bool fFromNewBroadcast, i
 
 void CMasternodePing::Relay(CConnman& connman)
 {
-    // Do not relay until fully synced
-    if(!masternodeSync.IsSynced()) {
-        LogPrint("masternode", "CMasternodePing::Relay -- won't relay until fully synced\n");
-        return;
-    }
-
     CInv inv(MSG_MASTERNODE_PING, GetHash());
     connman.RelayInv(inv);
 }

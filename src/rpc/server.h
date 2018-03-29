@@ -123,7 +123,7 @@ public:
 };
 
 /**
- * Dash RPC command dispatcher.
+ * Agni RPC command dispatcher.
  */
 class CRPCTable
 {

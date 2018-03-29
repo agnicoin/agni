@@ -1,0 +1,6 @@
+usr/local/bin/agni-qt usr/bin
+share/pixmaps/agni32.xpm usr/share/pixmaps
+share/pixmaps/agni16.xpm usr/share/pixmaps
+share/pixmaps/agni128.png usr/share/pixmaps
+debian/agni-qt.desktop usr/share/applications
+debian/agni-qt.protocol usr/share/kde4/services/

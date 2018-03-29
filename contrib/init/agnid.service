@@ -1,0 +1,22 @@
+[Unit]
+Description=Agni's distributed currency daemon
+After=network.target
+
+[Service]
+User=agnicore
+Group=agnicore
+
+Type=forking
+PIDFile=/var/lib/agnid/agnid.pid
+ExecStart=/usr/bin/agnid -daemon -pid=/var/lib/agnid/agnid.pid \
+-conf=/etc/agnicore/agni.conf -datadir=/var/lib/agnid -disablewallet
+
+Restart=always
+PrivateTmp=true
+TimeoutStopSec=60s
+TimeoutStartSec=2s
+StartLimitInterval=120s
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

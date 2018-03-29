@@ -1,6 +1,46 @@
 # start-many Setup Guide
 
-## Setting up your Wallet
+## Two Options for Setting up your Wallet
+There are many ways to setup a wallet to support start-many. This guide will walk through two of them.
+
+1. [Importing an existing wallet (recommended if you are consolidating wallets).](#option1)
+2. [Sending 1000 AGNI to new wallet addresses.](#option2)
+
+## <a name="option1"></a>Option 1. Importing an existing wallet
+
+This is the way to go if you are consolidating multiple wallets into one that supports start-many. 
+
+### From your single-instance Masternode Wallet
+
+Open your QT Wallet and go to console (from the menu select `Tools` => `Debug Console`)
+
+Dump the private key from your MasterNode's pulic key.
+
+```
+walletpassphrase [your_wallet_passphrase] 600
+dumpprivkey [mn_public_key]
+```
+
+Copy the resulting priviate key. You'll use it in the next step.
+
+### From your multi-instance Masternode Wallet
+
+Open your QT Wallet and go to console (from the menu select `Tools` => `Debug Console`)
+
+Import the private key from the step above.
+
+```
+walletpassphrase [your_wallet_passphrase] 600
+importprivkey [single_instance_private_key]
+```
+
+The wallet will re-scan and you will see your available balance increase by the amount that was in the imported wallet.
+
+[Skip Option 2. and go to Create masternode.conf file](#masternodeconf)
+
+## <a name="option2"></a>Option 2. Starting with a new wallet
+
+[If you used Option 1 above, then you can skip down to Create masternode.conf file.](#masternodeconf)
 
 ### Create New Wallet Addresses
 
@@ -16,9 +56,9 @@ Create a new wallet address for each Masternode.
 
 Close your QT Wallet.
 
-### Send 1000 DASH to New Addresses
+### Send 1000 AGNI to New Addresses
 
-Send exactly 1000 DASH to each new address created above.
+Just like setting up a standard MN. Send exactly 1000 AGNI to each new address created above.
 
 ### Create New Masternode Private Keys
 
@@ -38,9 +78,11 @@ Remember... this is local. Make sure your QT is not running.
 
 Create the `masternode.conf` file in the same directory as your `wallet.dat`.
 
-Copy the masternode private key and correspondig collateral output transaction that holds the 1000 DASH.
+Copy the masternode private key and correspondig collateral output transaction that holds the 1000 AGNI.
 
-*Note: The masternode priviate key is **not** the same as a wallet private key. **Never** put your wallet private key in the masternode.conf file. That is almost equivalent to putting your 1000 DASH on the remote server and defeats the purpose of a hot/cold setup.*
+The masternode private key may be an existing key from [Option 1](#option1), or a newly generated key from [Option 2](#option2). 
+
+*Note: The masternode priviate key is **not** the same as a wallet private key. **Never** put your wallet private key in the masternode.conf file. That is almost equivalent to putting your 1000 AGNI on the remote server and defeats the purpose of a hot/cold setup.*
 
 ### Get the collateral output
 
@@ -53,7 +95,7 @@ Issue the following:
 Make note of the hash (which is your collateral_output) and index.
 
 ### Enter your Masternode details into your masternode.conf file
-[From the dash github repo](https://github.com/dashpay/dash/blob/master/doc/masternode_conf.md)
+[From the agni github repo](https://github.com/agnicoin/agni/blob/master/doc/masternode_conf.md)
 
 `masternode.conf` format is a space seperated text file. Each line consisting of an alias, IP address followed by port, masternode private key, collateral output transaction id and collateral output index.
 
@@ -68,16 +110,20 @@ mn01 127.0.0.1:9999 93HaYBVUCYjEMeeH1Y4sBGLALQZE1Yc1K64xiqgX37tGBDQL8Xg 2bcd3c84
 mn02 127.0.0.2:9999 93WaAb3htPJEV8E9aQcN23Jt97bPex7YvWfgMDTUdWJvzmrMqey aa9f1034d973377a5e733272c3d0eced1de22555ad45d6b24abadff8087948d4 0
 ```
 
-## Update dash.conf on server
+## What about the agni.conf file?
 
-If you generated a new masternode private key, you will need to update the remote `dash.conf` files.
+If you are using a `masternode.conf` file you no longer need the `agni.conf` file. The exception is if you need custom settings (_thanks oblox_). In that case you **must** remove `masternode=1` from local `agni.conf` file. This option should be used only to start local Hot masternode now.
+
+## Update agni.conf on server
+
+If you generated a new masternode private key, you will need to update the remote `agni.conf` files.
 
 Shut down the daemon and then edit the file.
 
-```nano .dashcore/dash.conf```
+```nano .agnicore/agni.conf```
 
 ### Edit the masternodeprivkey
-If you generated a new masternode private key, you will need to update the `masternodeprivkey` value in your remote `dash.conf` file.
+If you generated a new masternode private key, you will need to update the `masternodeprivkey` value in your remote `agni.conf` file.
 
 ## Start your Masternodes
 
@@ -87,9 +133,9 @@ If your remote server is not running, start your remote daemon as you normally w
 
 You can confirm that remote server is on the correct block by issuing
 
-```dash-cli getinfo```
+```agni-cli getinfo```
 
-and comparing with the official explorer at https://explorer.dash.org/chain/Dash
+and comparing with the official explorer at https://explorer.agnicoin.tech/chain/Agni
 
 ### Local
 
@@ -116,11 +162,11 @@ Example ```masternode start-alias mn01```
 Issue command `masternode status`
 It should return you something like that:
 ```
-dash-cli masternode status
+agni-cli masternode status
 {
     "outpoint" : "<collateral_output>-<collateral_output_index>",
     "service" : "<ipaddress>:<port>",
-    "pubkey" : "<1000 DASH address>",
+    "pubkey" : "<1000 AGNI address>",
     "status" : "Masternode successfully started"
 }
 ```
@@ -128,6 +174,6 @@ Command output should have "_Masternode successfully started_" in its `status` f
 
 ### Local
 
-Search your Masternodes on https://dashninja.pl/masternodes.html
+Search your Masternodes on https://agnininja.pl/masternodes.html
 
 _Hint: Bookmark it, you definitely will be using this site a lot._

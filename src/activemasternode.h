@@ -1,14 +1,13 @@
-// Copyright (c) 2014-2017 The Dash Core developers
+// Copyright (c) 2014-2017 The Agni Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef ACTIVEMASTERNODE_H
 #define ACTIVEMASTERNODE_H
 
-#include "chainparams.h"
-#include "key.h"
 #include "net.h"
-#include "primitives/transaction.h"
+#include "key.h"
+#include "wallet/wallet.h"
 
 class CActiveMasternode;
 
@@ -26,7 +25,8 @@ class CActiveMasternode
 public:
     enum masternode_type_enum_t {
         MASTERNODE_UNKNOWN = 0,
-        MASTERNODE_REMOTE  = 1
+        MASTERNODE_REMOTE  = 1,
+        MASTERNODE_LOCAL   = 2
     };
 
 private:
@@ -79,6 +79,7 @@ public:
 private:
     void ManageStateInitial(CConnman& connman);
     void ManageStateRemote();
+    void ManageStateLocal(CConnman& connman);
 };
 
 #endif

@@ -81,7 +81,7 @@ unsigned int static KimotoGravityWell(const CBlockIndex* pindexLast, const Conse
 }
 
 unsigned int static DarkGravityWave(const CBlockIndex* pindexLast, const Consensus::Params& params) {
-    /* current difficulty formula, dash - DarkGravity v3, written by Evan Duffield - evan@dash.org */
+    /* current difficulty formula, agni - DarkGravity v3, written by Evan Duffield - evan@dash.org */
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
     int64_t nPastBlocks = 24;
 
@@ -171,16 +171,33 @@ unsigned int GetNextWorkRequiredBTC(const CBlockIndex* pindexLast, const CBlockH
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
-    // Most recent algo first
-    if (pindexLast->nHeight + 1 >= params.nPowDGWHeight) {
-        return DarkGravityWave(pindexLast, params);
-    }
-    else if (pindexLast->nHeight + 1 >= params.nPowKGWHeight) {
-        return KimotoGravityWell(pindexLast, params);
-    }
-    else {
-        return GetNextWorkRequiredBTC(pindexLast, pblock, params);
-    }
+    unsigned int retarget = DIFF_DGW;
+
+//    // mainnet/regtest share a configuration
+//    if (Params().NetworkIDString() == CBaseChainParams::MAIN || Params().NetworkIDString() == CBaseChainParams::REGTEST) {
+//        if (pindexLast->nHeight + 1 >= 34140) retarget = DIFF_DGW;
+//        else if (pindexLast->nHeight + 1 >= 15200) retarget = DIFF_KGW;
+//        else retarget = DIFF_BTC;
+//    // testnet -- we want a lot of coins in existance early on
+//    } else {
+//        if (pindexLast->nHeight + 1 >= 4001) retarget = DIFF_DGW;
+//        else retarget = DIFF_BTC;
+//    }
+//
+//    // Bitcoin style retargeting
+//    if (retarget == DIFF_BTC)
+//    {
+//        return GetNextWorkRequiredBTC(pindexLast, pblock, params);
+//    }
+//
+//    // Retarget using Kimoto Gravity Wave
+//    else if (retarget == DIFF_KGW)
+//    {
+//        return KimotoGravityWell(pindexLast, params);
+//    }
+
+    // Retarget using Dark Gravity Wave 3 by default
+    return DarkGravityWave(pindexLast, params);
 }
 
 // for DIFF_BTC only!
